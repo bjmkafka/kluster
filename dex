@@ -1,0 +1,32 @@
+#!/bin/bash #-x
+#
+# dex: wrapper script for Docker exec bash
+#
+
+CMD=$(basename $0)
+
+if [ $CMD = dex ]; then
+    if [[ $# -gt 1 ]]; then
+	docker exec -it "$@"
+    elif [[ $# -eq 1 ]]; then
+	docker exec -it "$1" /bin/bash
+    else
+	docker exec -it base /bin/bash
+    fi
+elif [ $CMD = dcs ]; then
+    docker-compose ps
+elif [ $CMD = ddn ]; then
+    docker-compose down
+elif [ $CMD = ddv ]; then
+    docker-compose down -v
+elif [ $CMD = dl ]; then
+    docker logs $1
+elif [ $CMD = dps ]; then
+    docker ps "$@"
+elif [ $CMD = dpa ]; then
+    docker ps -a
+elif [ $CMD = dup ]; then
+    docker-compose up -d
+fi
+
+    

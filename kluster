@@ -1,0 +1,551 @@
+#!/bin/bash
+#
+# kluster: generate docker compose files for custom Confluent Platform clusters
+#
+
+VERSION=5.5.0     # Docker image version to use defaulting to current
+ZK=1              # Size of Zookeeper ensemble defaulting to standalone
+AK=3              # Number of brokers per cluster
+RACKS=0           # Round-robin brokers into racks if greater than 0
+CLUSTERS=1        # Prefix Zookeeper paths with "/<num>" if greater than 0
+JMX_PORTS=false   # Open ports for JMX on the first (or only) cluster
+KAFKA_ONLY=false  # Exclude conponents other than Zookeeper and Kafka if true
+KSQLDB=false      # Use ksqlDB conponents rather than KSQL
+
+usage() { echo "
+Usage:
+  $0 [-v <CP version>] [-b <# brokers>] [-r <# racks>] [options]
+  $0 -h|--help
+
+Options:
+  -b <int>     Number of Apache Kafka brokers (default: 3, max: 9)
+  -c           Number of clusters
+  -d           Use ksqlDB instead of KSQL
+  -k           Use Apache Kafka components only
+  -j           Open JMX ports (only for cluster 1)
+  -r <int>     Number of racks or availability zones (default: none)
+  -v <version> Confluent Platform version (default: 5.5.0)
+  -z           Zookeeper 3 node ensemble (default: standalone)
+  -Z <int>     Zookeeper ensemble with <int> nodes
+
+Ports:
+  Zookeeper client  218n
+  Zookeeper JMX     998n
+  Kafka client      909n
+  Kafka JMX         999n
+  REST API ports    defaults
+
+Mult-cluster Ports:
+  Zookeeper are Control Center are shared between clusters
+  Other components subtract 1000 for each cluster greater than 1
+
+IDs:
+  Zookeeper    n
+  Broker ID  10n
+  Rack ID    1n0
+  Cluster ID n00
+" 1>&2; exit 1; }
+
+#
+# Component functions
+#
+
+header () {
+    cat << EOF
+version: '3.5'
+services:
+
+  base:
+    image: confluentinc/cp-kafka-connect:$VERSION
+    container_name: base
+    hostname: base
+    networks:
+      - confluent
+    volumes:
+      - ./data:/data
+    command: /bin/sh
+    tty: true
+    environment:
+      CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-$VERSION.jar
+EOF
+}
+
+zookeeper () {
+    local i=$1
+    local ZKNODES=$2
+
+    echo "ZOOKEEPER $i zk$i" 1>&2
+    cat << EOF
+
+  zk${i}:
+    image: confluentinc/cp-zookeeper:$VERSION
+    container_name: zk${i}
+    hostname: zk${i}
+    # restart: always
+    volumes:
+      - data-zk${i}:/var/lib/zookeeper
+    networks:
+      - confluent
+    ports:
+      - 218${i}:2181
+EOF
+    if [ $JMX_PORTS = true ]; then
+	cat << EOF
+      - 998${i}:998${i}
+EOF
+    fi
+    cat << EOF
+    environment:
+      ZOOKEEPER_SERVER_ID: ${i}
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+EOF
+    if [ -n "$ZKNODES" ]; then
+	cat <<EOF
+      ZOOKEEPER_SERVERS: $ZKNODES
+EOF
+    fi
+    if [ $JMX_PORTS = true ]; then
+	cat << EOF
+      KAFKA_JMX_OPTS: '-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=zk${i} -Dcom.sun.management.jmxremote.rmi.port=998${i}'
+      JMX_PORT: 998${i}
+EOF
+    fi
+}
+
+broker () {
+    local CL=$1
+    local RK=$2
+    local ID=$3
+    local JMX=$4
+
+    local num=$CL$RK$ID
+    local port=$((10 - $CL))${RK}9$ID
+    cat <<EOF
+
+  kafka${num}:
+    image: confluentinc/cp-enterprise-kafka:$VERSION
+    container_name: kafka$num
+    hostname: kafka$num
+    networks:
+      - confluent
+    ports:
+      - ${port}:${port}
+EOF
+    if [ $JMX -gt 0 ]; then
+	cat << EOF
+      - ${JMX}:${JMX}
+EOF
+    fi
+    cat << EOF
+    volumes:
+      - data-kafka${num}:/var/lib/kafka/data
+    environment:
+      KAFKA_BROKER_ID: ${num}
+      KAFKA_ZOOKEEPER_CONNECT: $ZKLIST
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka${num}:${port}
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${REPL}
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: '$BOOT'
+EOF
+    if [ $JMX -gt 0 ]; then
+	cat << EOF
+      KAFKA_JMX_OPTS: '-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka${CL}${RK}$i -Dcom.sun.management.jmxremote.rmi.port=${JMX}'
+      JMX_PORT: ${JMX}
+EOF
+    fi
+    if [ $RACKS -gt 0 ]; then
+	cat <<EOF
+      KAFKA_BROKER_RACK: rack${RK}
+EOF
+    fi
+}
+
+components () {
+    cat <<EOF
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:$VERSION
+    container_name: schema-registry
+    ports:
+      - 8081:8081
+    networks:
+      - confluent
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: $ZKLIST
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+
+  connect:
+    image: confluentinc/cp-kafka-connect:$VERSION
+    container_name: connect
+    hostname: connect
+    ports:
+      - 8083:8083
+    volumes:
+      - ./data:/data
+    networks:
+      - confluent
+    environment:
+      CONNECT_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+      CONNECT_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+      CONNECT_BOOTSTRAP_SERVERS: $BOOT
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: 'connect'
+      CONNECT_CONFIG_STORAGE_TOPIC: 'connect-config'
+      CONNECT_OFFSET_STORAGE_TOPIC: 'connect-offsets'
+      CONNECT_STATUS_STORAGE_TOPIC: 'connect-status'
+      CONNECT_REPLICATION_FACTOR: ${REPL}
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: ${REPL}
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: ${REPL}
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: ${REPL}
+      CONNECT_KEY_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_VALUE_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      CONNECT_INTERNAL_KEY_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
+      CONNECT_INTERNAL_VALUE_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
+      CONNECT_REST_ADVERTISED_HOST_NAME: 'connect'
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_LOG4J_LOGGERS: org.reflections=ERROR
+      CONNECT_PLUGIN_PATH: /usr/share/java
+      CONNECT_REST_HOST_NAME: 'connect'
+
+  rest-proxy:
+    image: confluentinc/cp-kafka-rest:$VERSION
+    container_name: rest-proxy
+    ports:
+      - 8082:8082
+    networks:
+      - confluent
+    environment:
+      KAFKA_REST_HOST_NAME: rest-proxy
+      KAFKA_REST_BOOTSTRAP_SERVERS: $BOOT
+      KAFKA_REST_LISTENERS: 'http://0.0.0.0:8082'
+      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+EOF
+}
+
+ksql () {
+    cat <<EOF
+
+  ksql-server:
+    image: confluentinc/cp-ksql-server:$VERSION
+    container_name: ksql-server
+    ports:
+      - 8088:8088
+    networks:
+      - confluent
+    environment:
+      KSQL_CONFIG_DIR: '/etc/ksql'
+      KSQL_LOG4J_OPTS: '-Dlog4j.configuration=file:/etc/ksql/log4j-rolling.properties'
+      KSQL_BOOTSTRAP_SERVERS: $BOOT
+      KSQL_HOST_NAME: ksql-server
+      KSQL_APPLICATION_ID: 'etl-demo'
+      KSQL_LISTENERS: 'http://0.0.0.0:8088'
+      KSQL_CACHE_MAX_BYTES_BUFFERING: 0
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+      KSQL_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+      KSQL_KSQL_SERVER_UI_ENABLED: 'false'
+
+  ksql-cli:
+    image: confluentinc/cp-ksql-cli:$VERSION
+    container_name: ksql-cli
+    networks:
+      - confluent
+    entrypoint: /bin/sh
+    tty: true
+EOF
+}
+
+ksqldb () {
+    cat <<EOF	    
+
+  ksql-server:
+    image: confluentinc/cp-ksqldb-server:$VERSION
+    container_name: ksql-server
+    ports:
+      - 8088:8088
+    networks:
+      - confluent
+    environment:
+      KSQL_CONFIG_DIR: '/etc/ksql'
+      KSQL_LOG4J_OPTS: '-Dlog4j.configuration=file:/etc/ksql/log4j-rolling.properties'
+      KSQL_BOOTSTRAP_SERVERS: $BOOT
+      KSQL_HOST_NAME: ksql-server
+      KSQL_APPLICATION_ID: 'etl-demo'
+      KSQL_LISTENERS: 'http://0.0.0.0:8088'
+      KSQL_CACHE_MAX_BYTES_BUFFERING: 0
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+      KSQL_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+      KSQL_KSQL_SERVER_UI_ENABLED: 'false'
+
+  ksql-cli:
+    image: confluentinc/cp-ksqldb-cli:$VERSION
+    container_name: ksql-cli
+    networks:
+      - confluent
+    entrypoint: /bin/sh
+    tty: true
+EOF
+}
+
+ksqlDB () {
+    cat <<EOF
+
+  ksql-server:
+    image: confluentinc/ksqldb-server:latest
+    hostname: ksql-server
+    container_name: ksql-server
+    ports:
+      - 8088:8088
+    networks:
+      - confluent
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_BOOTSTRAP_SERVERS: $BOOT
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
+      KSQL_APPLICATION_ID: 'etl-demo'
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+
+  ksql-cli:
+    image: confluentinc/ksqldb-cli:latest
+    container_name: ksql-cli
+    networks:
+      - confluent
+    entrypoint: /bin/sh
+    tty: true
+EOF
+}
+
+controlCenter() {
+   cat <<EOF
+
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:$VERSION
+    container_name: control-center
+    restart: always
+    networks:
+      - confluent
+    ports:
+      - 9021:9021
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: $BOOT
+      CONTROL_CENTER_ZOOKEEPER_CONNECT: $ZKLIST
+      CONTROL_CENTER_REPLICATION_FACTOR: ${REPL}
+      CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_REPLICATION: ${REPL}
+      CONTROL_CENTER_INTERNAL_TOPICS_REPLICATION: ${REPL}
+      CONTROL_CENTER_COMMAND_TOPIC_REPLICATION: ${REPL}
+      CONTROL_CENTER_METRICS_TOPIC_REPLICATION: ${REPL}
+      CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 3
+      CONTROL_CENTER_STREAMS_CONSUMER_REQUEST_TIMEOUT_MS: '960032'
+      CONTROL_CENTER_CONNECT_CLUSTER: 'connect:8083'
+      CONTROL_CENTER_KSQL_URL: 'http://ksql-server:8088'
+      CONTROL_CENTER_KSQL_ADVERTISED_URL: 'http://localhost:8088'
+      CONTROL_CENTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+EOF
+}
+
+volumes () {
+    cat <<EOF
+
+volumes:
+EOF
+
+    for i in $(seq 1 $ZK); do
+	cat <<EOF
+  data-zk${i}:
+EOF
+    done
+
+    for c in $(seq 1 $CLUSTERS); do
+	for i in $(seq 1 $AK); do
+	    r=0
+	    b=$i
+	    if [ $RACKS -gt 0 ]; then
+		r=$((($i - 1) % $RACKS + 1))
+		b=$((($i - 1) / $RACKS + 1))
+	    fi
+	    cat <<EOF
+  data-kafka${c}${r}${b}:
+EOF
+	done
+    done
+
+    cat <<EOF
+networks:
+  confluent:
+EOF
+}
+
+#
+# Parse arguments
+#
+
+while getopts ":b:c:dhjkr:v:zZ:" o; do
+    case "${o}" in
+        b)
+            AK=${OPTARG}
+	    if [[ $AK -lt 1 ]]; then
+		echo "Invalid number of brokers: $AK" 1>&2; exit 2;
+	    fi
+            ;;
+	c)
+            CLUSTERS=${OPTARG}
+	    if [[ ( $CLUSTERS -lt 0 ) || ( $CLUSTERS -gt 9 ) ]]; then
+		echo "Invalid number of clusters: $CLUSTERS" 1>&2; exit 2;
+	    fi
+	    ;;
+	d)
+	    KSQLDB=true
+	    ;;
+	j)
+	    JMX_PORTS=true
+	    ;;
+	k)
+	    KAFKA_ONLY=true
+	    ;;
+	r)
+	    RACKS=${OPTARG}
+	    if [[ ( $RACKS -lt 0 ) || ( $RACKS -gt 9 ) ]]; then
+		echo "Invalid number of racks: $RACKS" 1>&2; exit 2;
+	    fi
+	    ;;
+        v)
+            VERSION=${OPTARG}
+            ;;
+	z)
+	    ZK=3
+	    ;;
+	Z)
+	    ZK=${OPTARG}
+	    if [[ ( $ZK -lt 1 ) || ( $ZK -gt 9 ) ]]; then
+		echo "Invalid number of zookeepers: $ZK" 1>&2; exit 2;
+	    fi
+	    ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+#
+# Validate and set global variables
+#
+
+if [[ $VERSION =~ ^[0-9].[0-9].[0-9]$ ]]; then
+    VERINT=$(( (${VERSION//./}) / 10))
+else
+    echo "Invalid version: $VERSION" 1>&2; exit 2;
+fi
+
+if [[ $RACKS -lt 1 ]]; then
+    if [[ $AK -gt 9 ]]; then
+	echo "Too many brokers for 0 racks: $AK" 1>&2; exit 2;
+    fi
+elif [[ $AK -gt $((9 * $RACKS)) ]]; then
+    echo "Too many brokers for $RACKS racks: $AK" 1>&2; exit 2;
+fi
+
+#
+# call component functions
+#
+
+header
+
+ZKNODES=""
+ZKCONNECT="zk1:2181"
+
+if [ $ZK -gt 1 ]; then
+    ZKNODES=zk1:2888:3888  
+    for i in $(seq 2 $ZK); do
+	ZKNODES="${ZKNODES};zk${i}:2888:3888"
+	ZKCONNECT="$ZKCONNECT,zk${i}:2181"
+    done
+fi
+
+for i in $(seq 1 $ZK); do
+    zookeeper "$i" "$ZKNODES"
+done
+
+REPL=3;
+if [ $AK -lt 3 ]; then
+    REPL=$AK
+fi
+
+#
+# Per cluster components
+#
+
+for c in $(seq 1 $CLUSTERS); do
+    ZKLIST=$ZKCONNECT
+
+    if [ $CLUSTERS -gt 1 ]; then
+	ZKLIST="${ZKLIST}/cluster$c"
+    fi
+
+    BOOT=""
+    for i in $(seq 1 $REPL); do
+	r=0
+	b=$i
+	if [ $RACKS -gt 0 ]; then
+	    r=$((($i - 1) % $RACKS + 1))
+	    b=$((($i - 1) / $RACKS + 1))
+	fi
+	if [ $i -eq 1 ]; then
+	    BOOT="kafka1${r}${b}:9${r}9${b}"
+	else
+	    BOOT="${BOOT},kafka1${r}${b}:9${r}9${b}"
+	fi
+    done
+
+    for i in $(seq 1 $AK); do
+	r=0
+	b=$i
+	j=0
+
+	if [ $RACKS -gt 0 ]; then
+	    r=$((($i - 1) % $RACKS + 1))
+	    b=$((($i - 1) / $RACKS + 1))
+	fi
+	if [[ ( $JMX_PORTS = true ) && ( $c -eq 1 ) && ( $i -le 9 ) ]]; then
+	    j="999${i}"
+	fi
+	echo "CLUSTER $c RACK $r BROKER $b kafka$c$r$b" 1>&2
+
+	broker "$c" "$r" "$b" "$j"
+    done
+done
+
+#
+# Currently, other components are only configured for cluster 1
+#
+
+if [ $KAFKA_ONLY = false ]; then
+    components "$CLUSTERS"
+    if [ $KSQLDB = true ]; then
+	ksqlDB
+    elif [ $VERINT -ge 55 ]; then
+	ksqldb
+    elif [ $VERINT -ge 50 ]; then
+	ksql
+    fi
+fi
+
+#
+# One C3 for all and storage volumes
+#
+
+controlCenter
+
+volumes
+
+exit 0
