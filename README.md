@@ -44,7 +44,7 @@ IDs:
   Cluster ID n00
 ```
 
-TCP/IP ports are opened to all interactions with external programs. The port number attempt to be non-conflicting so that you can reach all containers from `localhost` which is especially important when using macOS.
+TCP/IP ports are opened to all interactions with external programs. The port numbers attempt to be non-conflicting so that you can reach all containers from `localhost` which is especially important when using macOS.
 
 
 

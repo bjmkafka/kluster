@@ -218,11 +218,11 @@ components () {
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
       CONNECT_INTERNAL_KEY_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
       CONNECT_INTERNAL_VALUE_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
-      CONNECT_REST_ADVERTISED_HOST_NAME: 'connect'
+      CONNECT_REST_ADVERTISED_HOST_NAME: 'connect${i}'
       CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
       CONNECT_LOG4J_LOGGERS: org.reflections=ERROR
       CONNECT_PLUGIN_PATH: /usr/share/java
-      CONNECT_REST_HOST_NAME: 'connect'
+      CONNECT_REST_HOST_NAME: 'connect${i}'
 
   rest-proxy${i}:
     image: confluentinc/cp-kafka-rest:$VERSION
