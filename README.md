@@ -26,12 +26,12 @@ Options:
   -z           Zookeeper 3 node ensemble (default: standalone)
   -Z <int>     Zookeeper ensemble with <int> nodes
 
-Ports:
-  Zookeeper client  218n
+Ports exposed on localhost:
+  Zookeeper client  1000n
+  Kafka client      10crb
   Zookeeper JMX     998n
-  Kafka client      909n
   Kafka JMX         999n
-  REST API ports    defaults
+  REST API ports    defaults + 10000
 
 Mult-cluster Ports:
   Zookeeper are Control Center are shared between clusters
