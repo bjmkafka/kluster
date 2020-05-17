@@ -28,12 +28,12 @@ Options:
   -z           Zookeeper 3 node ensemble (default: standalone)
   -Z <int>     Zookeeper ensemble with <int> nodes
 
-Ports:
-  Zookeeper client  218n
+Ports exposed on localhost:
+  Zookeeper client  1000n
+  Kafka client      10crb
   Zookeeper JMX     998n
-  Kafka client      909n
   Kafka JMX         999n
-  REST API ports    defaults
+  REST API ports    defaults + 10000
 
 Mult-cluster Ports:
   Zookeeper are Control Center are shared between clusters
@@ -87,7 +87,7 @@ zookeeper () {
     networks:
       - confluent
     ports:
-      - 218${i}:2181
+      - 1000${i}:2181
 EOF
     if [ $JMX_PORTS = true ]; then
 	cat << EOF
@@ -122,7 +122,7 @@ broker () {
     local JMX=$4
 
     local num=$CL$RK$ID
-    local port=$((10 - $CL))${RK}9$ID
+    local port="10${CL}${RK}$ID"
     cat <<EOF
 
   kafka${num}:
@@ -145,7 +145,8 @@ EOF
     environment:
       KAFKA_BROKER_ID: ${num}
       KAFKA_ZOOKEEPER_CONNECT: $ZKLIST
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka${num}:${port}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,LOCALHOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka${num}:9092,LOCALHOST://localhost:${port}
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${REPL}
@@ -166,35 +167,43 @@ EOF
 }
 
 components () {
+    local CL=$1
+
+    i=""
+    p=$((9 - $CL))
+    if [ $CLUSTERS -gt 1 ]; then
+	i=$CL
+    fi
+    
     cat <<EOF
 
-  schema-registry:
+  schema-registry${i}:
     image: confluentinc/cp-schema-registry:$VERSION
-    container_name: schema-registry
+    container_name: schema-registry${i}
     ports:
-      - 8081:8081
+      - 1${p}081:1${p}081
     networks:
       - confluent
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: $ZKLIST
-      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:1${p}081
 
-  connect:
+  connect${i}:
     image: confluentinc/cp-kafka-connect:$VERSION
-    container_name: connect
-    hostname: connect
+    container_name: connect${i}
+    hostname: connect${i}
     ports:
-      - 8083:8083
+      - 1${p}083:1${p}083
     volumes:
-      - ./data:/data
+      - ./data${i}:/data
     networks:
       - confluent
     environment:
       CONNECT_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
       CONNECT_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       CONNECT_BOOTSTRAP_SERVERS: $BOOT
-      CONNECT_REST_PORT: 8083
+      CONNECT_REST_PORT: 1${p}083
       CONNECT_GROUP_ID: 'connect'
       CONNECT_CONFIG_STORAGE_TOPIC: 'connect-config'
       CONNECT_OFFSET_STORAGE_TOPIC: 'connect-offsets'
@@ -205,8 +214,8 @@ components () {
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: ${REPL}
       CONNECT_KEY_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
       CONNECT_VALUE_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
       CONNECT_INTERNAL_KEY_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
       CONNECT_INTERNAL_VALUE_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
       CONNECT_REST_ADVERTISED_HOST_NAME: 'connect'
@@ -215,18 +224,18 @@ components () {
       CONNECT_PLUGIN_PATH: /usr/share/java
       CONNECT_REST_HOST_NAME: 'connect'
 
-  rest-proxy:
+  rest-proxy${i}:
     image: confluentinc/cp-kafka-rest:$VERSION
-    container_name: rest-proxy
+    container_name: rest-proxy${i}
     ports:
-      - 8082:8082
+      - 1${p}082:1${p}082
     networks:
       - confluent
     environment:
       KAFKA_REST_HOST_NAME: rest-proxy
       KAFKA_REST_BOOTSTRAP_SERVERS: $BOOT
-      KAFKA_REST_LISTENERS: 'http://0.0.0.0:8082'
-      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      KAFKA_REST_LISTENERS: 'http://0.0.0.0:1${p}082'
+      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
 EOF
 }
 
@@ -501,9 +510,9 @@ for c in $(seq 1 $CLUSTERS); do
 	    b=$((($i - 1) / $RACKS + 1))
 	fi
 	if [ $i -eq 1 ]; then
-	    BOOT="kafka1${r}${b}:9${r}9${b}"
+	    BOOT="kafka1${r}${b}:9092"
 	else
-	    BOOT="${BOOT},kafka1${r}${b}:9${r}9${b}"
+	    BOOT="${BOOT},kafka${c}${r}${b}:9092"
 	fi
     done
 
@@ -522,15 +531,18 @@ for c in $(seq 1 $CLUSTERS); do
 	echo "CLUSTER $c RACK $r BROKER $b kafka$c$r$b" 1>&2
 
 	broker "$c" "$r" "$b" "$j"
+
     done
+    if [ $KAFKA_ONLY = false ]; then
+	components "$c"
+    fi
 done
 
 #
-# Currently, other components are only configured for cluster 1
+# Currently, KSQL is only configured for cluster 1
 #
 
 if [ $KAFKA_ONLY = false ]; then
-    components "$CLUSTERS"
     if [ $KSQLDB = true ]; then
 	ksqlDB
     elif [ $VERINT -ge 55 ]; then
