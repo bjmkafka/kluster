@@ -246,7 +246,7 @@ ksql () {
     image: confluentinc/cp-ksql-server:$VERSION
     container_name: ksql-server
     ports:
-      - 8088:8088
+      - 18088:18088
     networks:
       - confluent
     environment:
@@ -255,7 +255,7 @@ ksql () {
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_HOST_NAME: ksql-server
       KSQL_APPLICATION_ID: 'etl-demo'
-      KSQL_LISTENERS: 'http://0.0.0.0:8088'
+      KSQL_LISTENERS: 'http://0.0.0.0:18088'
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
@@ -279,7 +279,7 @@ ksqldb () {
     image: confluentinc/cp-ksqldb-server:$VERSION
     container_name: ksql-server
     ports:
-      - 8088:8088
+      - 18088:18088
     networks:
       - confluent
     environment:
@@ -288,7 +288,7 @@ ksqldb () {
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_HOST_NAME: ksql-server
       KSQL_APPLICATION_ID: 'etl-demo'
-      KSQL_LISTENERS: 'http://0.0.0.0:8088'
+      KSQL_LISTENERS: 'http://0.0.0.0:18088'
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
@@ -313,11 +313,11 @@ ksqlDB () {
     hostname: ksql-server
     container_name: ksql-server
     ports:
-      - 8088:8088
+      - 18088:18088
     networks:
       - confluent
     environment:
-      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_LISTENERS: http://0.0.0.0:18088
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
@@ -344,7 +344,7 @@ controlCenter() {
     networks:
       - confluent
     ports:
-      - 9021:9021
+      - 19021:9021
     environment:
       CONTROL_CENTER_BOOTSTRAP_SERVERS: $BOOT
       CONTROL_CENTER_ZOOKEEPER_CONNECT: $ZKLIST
@@ -356,8 +356,8 @@ controlCenter() {
       CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 3
       CONTROL_CENTER_STREAMS_CONSUMER_REQUEST_TIMEOUT_MS: '960032'
       CONTROL_CENTER_CONNECT_CLUSTER: 'connect:8083'
-      CONTROL_CENTER_KSQL_URL: 'http://ksql-server:8088'
-      CONTROL_CENTER_KSQL_ADVERTISED_URL: 'http://localhost:8088'
+      CONTROL_CENTER_KSQL_URL: 'http://ksql-server:18088'
+      CONTROL_CENTER_KSQL_ADVERTISED_URL: 'http://localhost:18088'
       CONTROL_CENTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
 EOF
 }
@@ -550,13 +550,8 @@ if [ $KAFKA_ONLY = false ]; then
     elif [ $VERINT -ge 50 ]; then
 	ksql
     fi
+    controlCenter
 fi
-
-#
-# One C3 for all and storage volumes
-#
-
-controlCenter
 
 volumes
 
