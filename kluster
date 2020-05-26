@@ -451,7 +451,7 @@ shift $((OPTIND-1))
 #
 
 if [[ $VERSION =~ ^[0-9].[0-9].[0-9]$ ]]; then
-    VERINT=$(( (${VERSION//./}) / 10))
+    VERINT=${VERSION//./}
 else
     echo "Invalid version: $VERSION" 1>&2; exit 2;
 fi
@@ -545,9 +545,9 @@ done
 if [ $KAFKA_ONLY = false ]; then
     if [ $KSQLDB = true ]; then
 	ksqlDB
-    elif [ $VERINT -ge 55 ]; then
+    elif [ $VERINT -ge 550 ]; then
 	ksqldb
-    elif [ $VERINT -ge 50 ]; then
+    elif [ $VERINT -ge 412 ]; then
 	ksql
     fi
     controlCenter
