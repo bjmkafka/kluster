@@ -113,6 +113,11 @@ EOF
       JMX_PORT: 998${i}
 EOF
     fi
+    if [ $VERINT -ge 540 ]; then
+	cat <<EOF
+      KAFKA_OPTS: '-Dzookeeper.4lw.commands.whitelist=*'
+EOF
+    fi
 }
 
 broker () {
