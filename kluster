@@ -186,20 +186,20 @@ components () {
     image: confluentinc/cp-schema-registry:$VERSION
     container_name: schema-registry${i}
     ports:
-      - 1${p}081:1${p}081
+      - 1${p}081:${p}081
     networks:
       - confluent
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: $ZKLIST
-      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:1${p}081
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:${p}081
 
   connect${i}:
     image: confluentinc/cp-kafka-connect:$VERSION
     container_name: connect${i}
     hostname: connect${i}
     ports:
-      - 1${p}083:1${p}083
+      - 1${p}083:${p}083
     volumes:
       - ./data${i}:/data
     networks:
@@ -208,7 +208,7 @@ components () {
       CONNECT_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
       CONNECT_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       CONNECT_BOOTSTRAP_SERVERS: $BOOT
-      CONNECT_REST_PORT: 1${p}083
+      CONNECT_REST_PORT: ${p}083
       CONNECT_GROUP_ID: 'connect'
       CONNECT_CONFIG_STORAGE_TOPIC: 'connect-config'
       CONNECT_OFFSET_STORAGE_TOPIC: 'connect-offsets'
@@ -219,8 +219,8 @@ components () {
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: ${REPL}
       CONNECT_KEY_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
       CONNECT_VALUE_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
-      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
-      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:${p}081'
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:${p}081'
       CONNECT_INTERNAL_KEY_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
       CONNECT_INTERNAL_VALUE_CONVERTER: 'org.apache.kafka.connect.json.JsonConverter'
       CONNECT_REST_ADVERTISED_HOST_NAME: 'connect${i}'
@@ -233,14 +233,14 @@ components () {
     image: confluentinc/cp-kafka-rest:$VERSION
     container_name: rest-proxy${i}
     ports:
-      - 1${p}082:1${p}082
+      - 1${p}082:${p}082
     networks:
       - confluent
     environment:
       KAFKA_REST_HOST_NAME: rest-proxy
       KAFKA_REST_BOOTSTRAP_SERVERS: $BOOT
-      KAFKA_REST_LISTENERS: 'http://0.0.0.0:1${p}082'
-      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:1${p}081'
+      KAFKA_REST_LISTENERS: 'http://0.0.0.0:${p}082'
+      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:${p}081'
 EOF
 }
 
@@ -251,7 +251,7 @@ ksql () {
     image: confluentinc/cp-ksql-server:$VERSION
     container_name: ksql-server
     ports:
-      - 18088:18088
+      - 18088:8088
     networks:
       - confluent
     environment:
@@ -260,7 +260,7 @@ ksql () {
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_HOST_NAME: ksql-server
       KSQL_APPLICATION_ID: 'etl-demo'
-      KSQL_LISTENERS: 'http://0.0.0.0:18088'
+      KSQL_LISTENERS: 'http://0.0.0.0:8088'
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
@@ -284,7 +284,7 @@ ksqldb () {
     image: confluentinc/cp-ksqldb-server:$VERSION
     container_name: ksql-server
     ports:
-      - 18088:18088
+      - 18088:8088
     networks:
       - confluent
     environment:
@@ -293,7 +293,7 @@ ksqldb () {
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_HOST_NAME: ksql-server
       KSQL_APPLICATION_ID: 'etl-demo'
-      KSQL_LISTENERS: 'http://0.0.0.0:18088'
+      KSQL_LISTENERS: 'http://0.0.0.0:8088'
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
@@ -318,11 +318,11 @@ ksqlDB () {
     hostname: ksql-server
     container_name: ksql-server
     ports:
-      - 18088:18088
+      - 18088:8088
     networks:
       - confluent
     environment:
-      KSQL_LISTENERS: http://0.0.0.0:18088
+      KSQL_LISTENERS: http://0.0.0.0:8088
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
@@ -361,8 +361,8 @@ controlCenter() {
       CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 3
       CONTROL_CENTER_STREAMS_CONSUMER_REQUEST_TIMEOUT_MS: '960032'
       CONTROL_CENTER_CONNECT_CLUSTER: 'connect:8083'
-      CONTROL_CENTER_KSQL_URL: 'http://ksql-server:18088'
-      CONTROL_CENTER_KSQL_ADVERTISED_URL: 'http://localhost:18088'
+      CONTROL_CENTER_KSQL_URL: 'http://ksql-server:8088'
+      CONTROL_CENTER_KSQL_ADVERTISED_URL: 'http://localhost:8088'
       CONTROL_CENTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
 EOF
 }
