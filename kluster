@@ -515,7 +515,7 @@ for c in $(seq 1 $CLUSTERS); do
 	    b=$((($i - 1) / $RACKS + 1))
 	fi
 	if [ $i -eq 1 ]; then
-	    BOOT="kafka1${r}${b}:9092"
+	    BOOT="kafka${c}${r}${b}:9092"
 	else
 	    BOOT="${BOOT},kafka${c}${r}${b}:9092"
 	fi
