@@ -156,7 +156,7 @@ EOF
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${REPL}
       KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: '$BOOT'
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: '$METRICS'
 EOF
     if [ $JMX -gt 0 ]; then
 	cat << EOF
@@ -340,7 +340,7 @@ EOF
 }
 
 controlCenter() {
-   cat <<EOF
+    cat <<EOF
 
   control-center:
     image: confluentinc/cp-enterprise-control-center:$VERSION
@@ -351,8 +351,20 @@ controlCenter() {
     ports:
       - 19021:9021
     environment:
-      CONTROL_CENTER_BOOTSTRAP_SERVERS: $BOOT
-      CONTROL_CENTER_ZOOKEEPER_CONNECT: $ZKLIST
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: $METRICS
+EOF
+    if [ $CLUSTERS -gt 1 ]; then
+	i=1
+	for b in $C3CL; do
+	    cat <<EOF
+      CONTROL_CENTER_KAFKA_CLUSTER${i}_BOOTSTRAP_SERVERS: $b
+EOF
+	    i=$(($i+1))
+	done
+    fi
+
+   cat <<EOF
+      CONTROL_CENTER_ZOOKEEPER_CONNECT: $C3ZK
       CONTROL_CENTER_REPLICATION_FACTOR: ${REPL}
       CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_REPLICATION: ${REPL}
       CONTROL_CENTER_INTERNAL_TOPICS_REPLICATION: ${REPL}
@@ -520,6 +532,14 @@ for c in $(seq 1 $CLUSTERS); do
 	    BOOT="${BOOT},kafka${c}${r}${b}:9092"
 	fi
     done
+
+    if [ $c -eq 1 ]; then
+	C3ZK=$ZKLIST
+	METRICS=$BOOT
+	C3CL="$BOOT"
+    else
+	C3CL="$C3CL $BOOT"
+    fi
 
     for i in $(seq 1 $AK); do
 	r=0
