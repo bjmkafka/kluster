@@ -83,7 +83,8 @@ zookeeper () {
     hostname: zk${i}
     # restart: always
     volumes:
-      - data-zk${i}:/var/lib/zookeeper
+      - data-zk${i}:/var/lib/zookeeper/data/version-2
+      - log-zk${i}:/var/lib/zookeeper/log/version-2
     networks:
       - confluent
     ports:
@@ -388,6 +389,7 @@ EOF
     for i in $(seq 1 $ZK); do
 	cat <<EOF
   data-zk${i}:
+  log-zk${i}:
 EOF
     done
 
