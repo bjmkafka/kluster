@@ -61,18 +61,19 @@ services:
 EOF
     if [ $OBSERVE = true ]; then
 	cat <<EOF
-  base:
-    image: confluentinc/cp-kafka-connect:$VERSION
-    container_name: base
-    hostname: base
+  tools:
+    image: cnfltraining/training-tools:latest
+    hostname: tools
+    container_name: tools
+    volumes:
+      - ${PWD}:/apps
+    environment:
+      CLASSPATH: "/usr/share/java/monitoring-interceptors/monitoring-interceptors-5.5.0.jar"
+    working_dir: /apps
     networks:
       - confluent
-    volumes:
-      - ./data:/data
-    command: /bin/sh
+    command: /bin/bash
     tty: true
-    environment:
-      CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-$VERSION.jar
 EOF
     fi
 }
