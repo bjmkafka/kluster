@@ -11,16 +11,18 @@ if [ $CMD = dex ]; then
     elif [[ $# -eq 1 ]]; then
 	docker exec -it "$1" /bin/bash
     else
-	docker exec -it base /bin/bash
+	docker exec -it tools /bin/bash
     fi
 elif [ $CMD = dcs ]; then
     docker-compose ps
+elif [ $CMD = dst ]; then
+    docker-compose stop
 elif [ $CMD = ddn ]; then
     docker-compose down
 elif [ $CMD = ddv ]; then
     docker-compose down -v
 elif [ $CMD = dl ]; then
-    docker logs $1
+    docker logs "$@"
 elif [ $CMD = dps ]; then
     docker ps "$@"
 elif [ $CMD = dpa ]; then
