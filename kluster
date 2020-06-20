@@ -11,6 +11,7 @@ CLUSTERS=1        # Prefix Zookeeper paths with "/<num>" if greater than 0
 JMX_PORTS=false   # Open ports for JMX on the first (or only) cluster
 KAFKA_ONLY=false  # Exclude conponents other than Zookeeper and Kafka if true
 KSQLDB=false      # Use ksqlDB conponents rather than KSQL
+OBSERVE=null      # Include Control Center and "base" containers
 
 usage() { echo "
 Usage:
@@ -23,6 +24,8 @@ Options:
   -d           Use ksqlDB instead of KSQL
   -k           Use Apache Kafka components only
   -j           Open JMX ports (only for cluster 1)
+  -o           Exclude observibility containers 'control-center' and 'base'
+  -O           Include 'control-center' and 'base'
   -r <int>     Number of racks or availability zones (default: none)
   -v <version> Confluent Platform version (default: 5.5.0)
   -z           Zookeeper 3 node ensemble (default: standalone)
@@ -55,6 +58,9 @@ header () {
 version: '3.5'
 services:
 
+EOF
+    if [ $OBSERVE = true ]; then
+	cat <<EOF
   base:
     image: confluentinc/cp-kafka-connect:$VERSION
     container_name: base
@@ -68,6 +74,7 @@ services:
     environment:
       CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-$VERSION.jar
 EOF
+    fi
 }
 
 zookeeper () {
@@ -417,7 +424,7 @@ EOF
 # Parse arguments
 #
 
-while getopts ":b:c:dhjkr:v:zZ:" o; do
+while getopts ":b:c:dhjkoOr:v:zZ:" o; do
     case "${o}" in
         b)
             AK=${OPTARG}
@@ -439,6 +446,12 @@ while getopts ":b:c:dhjkr:v:zZ:" o; do
 	    ;;
 	k)
 	    KAFKA_ONLY=true
+	    ;;
+	o)
+	    OBSERVE=false
+	    ;;
+	O)
+	    OBSERVE=true
 	    ;;
 	r)
 	    RACKS=${OPTARG}
@@ -481,6 +494,14 @@ if [[ $RACKS -lt 1 ]]; then
     fi
 elif [[ $AK -gt $((9 * $RACKS)) ]]; then
     echo "Too many brokers for $RACKS racks: $AK" 1>&2; exit 2;
+fi
+
+if [ $OBSERVE = "null" ]; then
+    if [ $KAFKA_ONLY = true ]; then
+	OBSERVE=false
+    else
+	OBSERVE=true
+    fi
 fi
 
 #
@@ -577,6 +598,9 @@ if [ $KAFKA_ONLY = false ]; then
     elif [ $VERINT -ge 412 ]; then
 	ksql
     fi
+fi
+
+if [ $OBSERVE = true ]; then
     controlCenter
 fi
 
