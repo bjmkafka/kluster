@@ -11,12 +11,15 @@ CLUSTERS=1        # Prefix Zookeeper paths with "/<num>" if greater than 0
 JMX_PORTS=false   # Open ports for JMX on the first (or only) cluster
 KAFKA_ONLY=false  # Exclude conponents other than Zookeeper and Kafka if true
 KSQLDB=false      # Use ksqlDB conponents rather than KSQL
-OBSERVE=null      # Include Control Center and "base" containers
+OBSERVE=null      # Include Control Center and "tools" containers
 
-usage() { echo "
+usage() {
+    CMD=$(basename $0)
+
+    echo "
 Usage:
-  $0 [-v <CP version>] [-b <# brokers>] [-r <# racks>] [options]
-  $0 -h|--help
+  $CMD [-v <CP version>] [-b <brokers>] [-r <racks>] [-r <clusters>] [options]
+  $CMD -h|--help
 
 Options:
   -b <int>     Number of Apache Kafka brokers (default: 3, max: 9)
@@ -24,8 +27,8 @@ Options:
   -d           Use ksqlDB instead of KSQL
   -k           Use Apache Kafka components only
   -j           Open JMX ports (only for cluster 1)
-  -o           Exclude observibility containers 'control-center' and 'base'
-  -O           Include 'control-center' and 'base'
+  -o           Exclude observibility containers 'control-center' and 'tools'
+  -O           Include 'control-center' and 'tools'
   -r <int>     Number of racks or availability zones (default: none)
   -v <version> Confluent Platform version (default: 5.5.0)
   -z           Zookeeper 3 node ensemble (default: standalone)
@@ -46,8 +49,10 @@ IDs:
   Zookeeper    n
   Broker ID  10n
   Rack ID    1n0
-  Cluster ID n00
-" 1>&2; exit 1; }
+  Cluster ID n00" 1>&2;
+
+    exit 1;
+}
 
 #
 # Component functions

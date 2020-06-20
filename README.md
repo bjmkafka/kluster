@@ -2,7 +2,7 @@
 
 A tool that will generate docker compose files for custom Confluent Platform kafka clusters.
 
-The output is ASCII text for a file that you can save as `docker-compose.yml` then run with the command:
+The output is ASCII text for a file that can be saved as `docker-compose.yml` then run with the command:
 
 ```
 $ docker-compose up -d
@@ -12,8 +12,8 @@ The default cluster has a standalone Zookeeper, three kafka brokers, a variety o
 
 ```
 Usage:
-  ./kluster [-v <CP version>] [-b <# brokers>] [-r <# racks>] [options]
-  ./kluster -h|--help
+  kluster [-v <CP version>] [-b <brokers>] [-r <racks>] [-r <clusters>] [options]
+  kluster -h|--help
 
 Options:
   -b <int>     Number of Apache Kafka brokers (default: 3, max: 9)
@@ -21,6 +21,8 @@ Options:
   -d           Use ksqlDB instead of KSQL
   -k           Use Apache Kafka components only
   -j           Open JMX ports (only for cluster 1)
+  -o           Exclude observibility containers 'control-center' and 'tools'
+  -O           Include 'control-center' and 'tools'
   -r <int>     Number of racks or availability zones (default: none)
   -v <version> Confluent Platform version (default: 5.5.0)
   -z           Zookeeper 3 node ensemble (default: standalone)
