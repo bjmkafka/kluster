@@ -96,8 +96,8 @@ zookeeper () {
     hostname: zk${i}
     # restart: always
     volumes:
-      - data-zk${i}:/var/lib/zookeeper/data/version-2
-      - log-zk${i}:/var/lib/zookeeper/log/version-2
+      - zk${i}-data:/var/lib/zookeeper/data
+      - zk${i}-log:/var/lib/zookeeper/log
     networks:
       - confluent
     ports:
@@ -160,7 +160,7 @@ EOF
     fi
     cat << EOF
     volumes:
-      - data-kafka${num}:/var/lib/kafka/data
+      - kafka${num}-data:/var/lib/kafka/data
     environment:
       KAFKA_BROKER_ID: ${num}
       KAFKA_ZOOKEEPER_CONNECT: $ZKLIST
@@ -215,7 +215,7 @@ components () {
     ports:
       - 1${p}083:${p}083
     volumes:
-      - ./data${i}:/data
+      - ./connect${i}-data:/data
     networks:
       - confluent
     environment:
@@ -401,8 +401,8 @@ EOF
 
     for i in $(seq 1 $ZK); do
 	cat <<EOF
-  data-zk${i}:
-  log-zk${i}:
+  zk${i}-data:
+  zk${i}-log:
 EOF
     done
 
@@ -415,7 +415,7 @@ EOF
 		b=$((($i - 1) / $RACKS + 1))
 	    fi
 	    cat <<EOF
-  data-kafka${c}${r}${b}:
+  kafka${c}${r}${b}-data:
 EOF
 	done
     done
