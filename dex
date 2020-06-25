@@ -15,8 +15,6 @@ if [ $CMD = dex ]; then
     fi
 elif [ $CMD = dcs ]; then
     docker-compose ps
-elif [ $CMD = dst ]; then
-    docker-compose stop
 elif [ $CMD = ddn ]; then
     docker-compose down
 elif [ $CMD = ddv ]; then
@@ -27,6 +25,8 @@ elif [ $CMD = dps ]; then
     docker ps "$@"
 elif [ $CMD = dpa ]; then
     docker ps -a
+elif [ $CMD = dst ]; then
+    docker-compose stop "$@"
 elif [ $CMD = dup ]; then
     docker-compose up -d
 fi
