@@ -3,7 +3,7 @@
 # kluster: generate docker compose files for custom Confluent Platform clusters
 #
 
-VERSION=5.5.0     # Docker image version to use defaulting to current
+VERSION=5.5.1     # Docker image version to use defaulting to current
 ZK=1              # Size of Zookeeper ensemble defaulting to standalone
 AK=3              # Number of brokers per cluster
 RACKS=0           # Round-robin brokers into racks if greater than 0
@@ -30,7 +30,7 @@ Options:
   -o           Exclude observibility containers 'control-center' and 'tools'
   -O           Include 'control-center' and 'tools'
   -r <int>     Number of racks or availability zones (default: none)
-  -v <version> Confluent Platform version (default: 5.5.0)
+  -v <version> Confluent Platform version (default: 5.5.1)
   -z           Zookeeper 3 node ensemble (default: standalone)
   -Z <int>     Zookeeper ensemble with <int> nodes
 
@@ -73,7 +73,7 @@ EOF
     volumes:
       - ${PWD}:/apps
     environment:
-      CLASSPATH: "/usr/share/java/monitoring-interceptors/monitoring-interceptors-5.5.0.jar"
+      CLASSPATH: "/usr/share/java/monitoring-interceptors/monitoring-interceptors-5.5.1.jar"
     working_dir: /apps
     networks:
       - confluent
@@ -141,7 +141,7 @@ broker () {
     local JMX=$4
 
     local num=$CL$RK$ID
-    local port="10${CL}${RK}$ID"
+    local port=10$num
     cat <<EOF
 
   kafka${num}:
