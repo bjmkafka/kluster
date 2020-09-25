@@ -17,7 +17,7 @@ CMD=$(basename $0)
 usage() {
     echo "
 Usage:
-  $CMD [-v <CP version>] [-b <brokers>] [-r <racks>] [-r <clusters>] [options]
+  $CMD [-v <CP version>] [-b <brokers>] [-r <racks>] [-c <clusters>] [options]
   $CMD -h|--help
 
 Options:

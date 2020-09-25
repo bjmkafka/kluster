@@ -12,7 +12,7 @@ The default cluster has a standalone Zookeeper, three kafka brokers, a variety o
 
 ```
 Usage:
-  kluster [-v <CP version>] [-b <brokers>] [-r <racks>] [-r <clusters>] [options]
+  kluster [-v <CP version>] [-b <brokers>] [-r <racks>] [-c <clusters>] [options]
   kluster -h|--help
 
 Options:
@@ -30,6 +30,7 @@ Options:
 
 Ports exposed on localhost:
   Zookeeper client  1000n
+  Zookeeper admin   1008n
   Kafka client      10crb
   Zookeeper JMX     998n
   Kafka JMX         999n
