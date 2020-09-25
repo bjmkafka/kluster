@@ -12,10 +12,9 @@ JMX_PORTS=false   # Open ports for JMX on the first (or only) cluster
 KAFKA_ONLY=false  # Exclude conponents other than Zookeeper and Kafka if true
 KSQLDB=false      # Use ksqlDB conponents rather than KSQL
 OBSERVE=null      # Include Control Center and "tools" containers
+CMD=$(basename $0)
 
 usage() {
-    CMD=$(basename $0)
-
     echo "
 Usage:
   $CMD [-v <CP version>] [-b <brokers>] [-r <racks>] [-r <clusters>] [options]
@@ -60,6 +59,9 @@ IDs:
 
 header () {
     cat << EOF
+#
+# Docker Compose file created from: "$CMD $ARGS"
+#
 version: '3.5'
 services:
 
@@ -429,6 +431,8 @@ EOF
 #
 # Parse arguments
 #
+
+ARGS="$@"
 
 while getopts ":b:c:dhjkoOr:v:zZ:" o; do
     case "${o}" in
