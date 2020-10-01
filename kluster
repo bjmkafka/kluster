@@ -146,10 +146,16 @@ broker () {
 
     local num=$CL$RK$ID
     local port=10$num
+
+    CPIMAGE=cp-enterprise-kafka
+    if [ $VERINT -ge 530 ]; then
+          CPIMAGE=cp-server
+    fi
+
     cat <<EOF
 
   kafka${num}:
-    image: confluentinc/cp-enterprise-kafka:$VERSION
+    image: confluentinc/${CPIMAGE}:$VERSION
     container_name: kafka$num
     hostname: kafka$num
     networks:
