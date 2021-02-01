@@ -24,7 +24,7 @@ Options:
   -o           Exclude observibility containers 'control-center' and 'tools'
   -O           Include 'control-center' and 'tools'
   -r <int>     Number of racks or availability zones (default: none)
-  -v <version> Confluent Platform version (default: 5.5.2)
+  -v <version> Confluent Platform version (default: 6.0.1)
   -z           Zookeeper 3 node ensemble (default: standalone)
   -Z <int>     Zookeeper ensemble with <int> nodes
 
