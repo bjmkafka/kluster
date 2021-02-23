@@ -148,8 +148,10 @@ broker () {
     local port=10$num
 
     CPIMAGE=cp-enterprise-kafka
+    KCIMAGE=cp-kafka-connect
     if [ $VERINT -ge 530 ]; then
           CPIMAGE=cp-server
+          KCIMAGE=cp-server-connect
     fi
 
     cat <<EOF
@@ -219,7 +221,7 @@ components () {
       SCHEMA_REGISTRY_LISTENERS: http://schema-registry:${p}081
 
   connect${i}:
-    image: confluentinc/cp-kafka-connect:$VERSION
+    image: confluentinc/${KCIMAGE}:$VERSION
     container_name: connect${i}
     hostname: connect${i}
     ports:
