@@ -20,7 +20,7 @@ elif [ $CMD = ddn ]; then
 elif [ $CMD = ddv ]; then
     docker-compose down -v
 elif [ $CMD = dl ]; then
-    docker logs "$@"
+    docker logs "$@" 2>&1
 elif [ $CMD = dps ]; then
     docker ps "$@"
 elif [ $CMD = dpa ]; then
@@ -28,7 +28,9 @@ elif [ $CMD = dpa ]; then
 elif [ $CMD = dst ]; then
     docker-compose stop "$@"
 elif [ $CMD = dup ]; then
-    docker-compose up -d
+    docker-compose up -d "$@"
+elif [ $CMD = dvl ]; then
+    docker volume ls | grep -e -
 fi
 
     
