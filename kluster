@@ -11,6 +11,7 @@ CLUSTERS=1        # Prefix Zookeeper paths with "/<num>" if greater than 0
 JMX_PORTS=false   # Open ports for JMX on the first (or only) cluster
 KAFKA_ONLY=false  # Exclude conponents other than Zookeeper and Kafka if true
 KSQLDB=false      # Use ksqlDB conponents rather than KSQL
+KSQLSRVRS=1       # Number of ksqlDB server instances
 OBSERVE=null      # Include Control Center and "tools" containers
 CMD=$(basename $0)
 
@@ -23,7 +24,8 @@ Usage:
 Options:
   -b <int>     Number of Apache Kafka brokers (default: 3, max: 9)
   -c <int>     Number of clusters
-  -d           Use ksqlDB instead of KSQL
+  -d           Use ksqlDB (.io) instead of CP KSQL
+  -D <int>     Number of ksqlDB server instances (default: 1)
   -k           Use Apache Kafka components only
   -j           Open JMX ports (only for cluster 1)
   -o           Exclude observibility containers 'control-center' and 'tools'
@@ -271,27 +273,31 @@ EOF
 }
 
 ksql () {
+    local i=$1
     cat <<EOF
 
-  ksql-server:
+  ksql-server${i}:
     image: confluentinc/cp-ksql-server:$VERSION
-    container_name: ksql-server
+    container_name: ksql-server${i}
     ports:
-      - 18088:8088
+      - 1${i}088:8088
     networks:
       - confluent
     environment:
       KSQL_CONFIG_DIR: '/etc/ksql'
-      KSQL_LOG4J_OPTS: '-Dlog4j.configuration=file:/etc/ksql/log4j-rolling.properties'
+      KSQL_LOG4J_OPTS: '-Dlog4j.configuration=file:/etc/ksql/log4j.properties'
       KSQL_BOOTSTRAP_SERVERS: $BOOT
-      KSQL_HOST_NAME: ksql-server
+      KSQL_HOST_NAME: ksql-server${i}
       KSQL_APPLICATION_ID: 'etl-demo'
-      KSQL_LISTENERS: 'http://0.0.0.0:8088'
+      KSQL_LISTENERS: 'http://ksql-server${i}:8088'
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
       KSQL_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       KSQL_KSQL_SERVER_UI_ENABLED: 'false'
+EOF
+    if [ $i -eq 1 ]; then
+	cat <<EOF
 
   ksql-cli:
     image: confluentinc/cp-ksql-cli:$VERSION
@@ -301,30 +307,35 @@ ksql () {
     entrypoint: /bin/sh
     tty: true
 EOF
+    fi
 }
 
 ksqldb () {
+    local i=$1
     cat <<EOF	    
 
-  ksql-server:
+  ksql-server${i}:
     image: confluentinc/cp-ksqldb-server:$VERSION
-    container_name: ksql-server
+    container_name: ksql-server${i}
     ports:
-      - 18088:8088
+      - 1${i}088:8088
     networks:
       - confluent
     environment:
       KSQL_CONFIG_DIR: '/etc/ksqldb'
-      KSQL_LOG4J_OPTS: '-Dlog4j.configuration=file:/etc/ksqldb/log4j-rolling.properties'
+      KSQL_LOG4J_OPTS: '-Dlog4j.configuration=file:/etc/ksqldb/log4j.properties'
       KSQL_BOOTSTRAP_SERVERS: $BOOT
-      KSQL_HOST_NAME: ksql-server
+      KSQL_HOST_NAME: ksql-server${i}
       KSQL_APPLICATION_ID: 'etl-demo'
-      KSQL_LISTENERS: 'http://0.0.0.0:8088'
+      KSQL_LISTENERS: 'http://ksql-server${i}:8088'
       KSQL_CACHE_MAX_BYTES_BUFFERING: 0
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
       KSQL_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
       KSQL_KSQL_SERVER_UI_ENABLED: 'false'
+EOF
+    if [ $i -eq 1 ]; then
+	cat <<EOF
 
   ksql-cli:
     image: confluentinc/cp-ksqldb-cli:$VERSION
@@ -334,26 +345,31 @@ ksqldb () {
     entrypoint: /bin/sh
     tty: true
 EOF
+    fi
 }
 
 ksqlDB () {
+    local i=$1
     cat <<EOF
 
-  ksql-server:
+  ksql-server${i}:
     image: confluentinc/ksqldb-server:latest
-    hostname: ksql-server
-    container_name: ksql-server
+    hostname: ksql-server${i}
+    container_name: ksql-server${i}
     ports:
-      - 18088:8088
+      - 1${i}088:8088
     networks:
       - confluent
     environment:
-      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_LISTENERS: http://ksql-server${i}:8088
       KSQL_BOOTSTRAP_SERVERS: $BOOT
       KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true'
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
       KSQL_APPLICATION_ID: 'etl-demo'
       KSQL_KSQL_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+EOF
+    if [ $i -eq 1 ]; then
+	cat <<EOF
 
   ksql-cli:
     image: confluentinc/ksqldb-cli:latest
@@ -363,6 +379,7 @@ ksqlDB () {
     entrypoint: /bin/sh
     tty: true
 EOF
+    fi
 }
 
 controlCenter() {
@@ -399,8 +416,8 @@ EOF
       CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 3
       CONTROL_CENTER_STREAMS_CONSUMER_REQUEST_TIMEOUT_MS: '960032'
       CONTROL_CENTER_CONNECT_CLUSTER: 'connect:8083'
-      CONTROL_CENTER_KSQL_URL: 'http://ksql-server:8088'
-      CONTROL_CENTER_KSQL_ADVERTISED_URL: 'http://localhost:8088'
+      CONTROL_CENTER_KSQL_URL: 'http://ksql-server1:8088'
+      CONTROL_CENTER_KSQL_DEFAULT_URL: 'http://ksql-server1:8088'
       CONTROL_CENTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
 EOF
 }
@@ -444,7 +461,7 @@ EOF
 
 ARGS="$@"
 
-while getopts ":b:c:dhjkoOr:v:zZ:" o; do
+while getopts ":b:c:dD:hjkoOr:v:zZ:" o; do
     case "${o}" in
         b)
             AK=${OPTARG}
@@ -460,6 +477,13 @@ while getopts ":b:c:dhjkoOr:v:zZ:" o; do
 	    ;;
 	d)
 	    KSQLDB=true
+	    ;;
+	D)
+	    KSQLSRVRS=${OPTARG}
+	    if [[ ( $KSQLSRVRS -lt 1 ) || ( $KSQLSRVRS -gt 9 ) ]]; then
+		echo "Invalid number of ksql-server instances: $KSQLSRVRS" \
+		     1>&2; exit 2;
+	    fi
 	    ;;
 	j)
 	    JMX_PORTS=true
@@ -610,15 +634,20 @@ done
 # Currently, KSQL is only configured for cluster 1
 #
 
-if [ $KAFKA_ONLY = false ]; then
-    if [ $KSQLDB = true ]; then
-	ksqlDB
-    elif [ $VERINT -ge 550 ]; then
-	ksqldb
-    elif [ $VERINT -ge 412 ]; then
-	ksql
+for i in $(seq 1 $KSQLSRVRS); do
+    if [ $KAFKA_ONLY = false ]; then
+	if [ $KSQLDB = true ]; then
+	    ksqlDB "$i"
+	    echo "ksqlDB $i ksql-server${i}" 1>&2
+	elif [ $VERINT -ge 550 ]; then
+	    ksqldb "$i"
+	    echo "ksqldb $i ksql-server${i}" 1>&2
+	elif [ $VERINT -ge 412 ]; then
+	    ksql "$i"
+	    echo "ksql $i ksql-server${i}" 1>&2
+	fi
     fi
-fi
+done
 
 if [ $OBSERVE = true ]; then
     controlCenter

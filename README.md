@@ -18,7 +18,8 @@ Usage:
 Options:
   -b <int>     Number of Apache Kafka brokers (default: 3, max: 9)
   -c           Number of clusters
-  -d           Use ksqlDB instead of KSQL
+  -d           Use ksqlDB (.io) instead of CP KSQL
+  -D <int>     Number of ksqlDB server instances (default: 1)
   -k           Use Apache Kafka components only
   -j           Open JMX ports (only for cluster 1)
   -o           Exclude observibility containers 'control-center' and 'tools'
