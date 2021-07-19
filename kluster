@@ -57,6 +57,13 @@ IDs:
 }
 
 #
+# Global variables
+#
+
+LAST_ZK=''
+LAST_BROKER=''
+
+#
 # Component functions
 #
 
@@ -91,6 +98,7 @@ EOF
 zookeeper () {
     local i=$1
     local ZKNODES=$2
+    LAST_ZK="zk$i"
 
     echo "ZOOKEEPER $i zk$i" 1>&2
     cat << EOF
@@ -148,6 +156,7 @@ broker () {
 
     local num=$CL$RK$ID
     local port=10$num
+    LAST_BROKER="kafka${num}"
 
     CPIMAGE=cp-enterprise-kafka
     KCIMAGE=cp-kafka-connect
@@ -162,6 +171,8 @@ broker () {
     image: confluentinc/${CPIMAGE}:$VERSION
     container_name: kafka$num
     hostname: kafka$num
+    depends_on:
+      - $LAST_ZK
     networks:
       - confluent
     ports:
@@ -213,6 +224,8 @@ components () {
   schema-registry${i}:
     image: confluentinc/cp-schema-registry:$VERSION
     container_name: schema-registry${i}
+    depends_on:
+      - $LAST_BROKER
     ports:
       - 1${p}081:${p}081
     networks:
@@ -226,6 +239,8 @@ components () {
     image: confluentinc/${KCIMAGE}:$VERSION
     container_name: connect${i}
     hostname: connect${i}
+    depends_on:
+      - $LAST_BROKER
     ports:
       - 1${p}083:${p}083
     volumes:
@@ -260,6 +275,8 @@ components () {
   rest-proxy${i}:
     image: confluentinc/cp-kafka-rest:$VERSION
     container_name: rest-proxy${i}
+    depends_on:
+      - $LAST_BROKER
     ports:
       - 1${p}082:${p}082
     networks:
@@ -279,6 +296,8 @@ ksql () {
   ksql-server${i}:
     image: confluentinc/cp-ksql-server:$VERSION
     container_name: ksql-server${i}
+    depends_on:
+      - $LAST_BROKER
     ports:
       - 1${i}088:8088
     networks:
@@ -317,6 +336,8 @@ ksqldb () {
   ksql-server${i}:
     image: confluentinc/cp-ksqldb-server:$VERSION
     container_name: ksql-server${i}
+    depends_on:
+      - $LAST_BROKER
     ports:
       - 1${i}088:8088
     networks:
@@ -356,6 +377,8 @@ ksqlDB () {
     image: confluentinc/ksqldb-server:latest
     hostname: ksql-server${i}
     container_name: ksql-server${i}
+    depends_on:
+      - $LAST_BROKER
     ports:
       - 1${i}088:8088
     networks:
@@ -388,6 +411,8 @@ controlCenter() {
   control-center:
     image: confluentinc/cp-enterprise-control-center:$VERSION
     container_name: control-center
+    depends_on:
+      - $LAST_BROKER
     restart: always
     networks:
       - confluent
