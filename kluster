@@ -3,7 +3,7 @@
 # kluster: generate docker compose files for custom Confluent Platform clusters
 #
 
-VERSION=6.1.1     # Docker image version to use defaulting to current
+VERSION=6.1.2     # Docker image version to use defaulting to current
 ZK=1              # Size of Zookeeper ensemble defaulting to standalone
 AK=3              # Number of brokers per cluster
 RACKS=0           # Round-robin brokers into racks if greater than 0
