@@ -8,7 +8,7 @@ The output is ASCII text for a file that can be saved as `docker-compose.yml` th
 $ docker-compose up -d
 ```
 
-The default cluster has a standalone Zookeeper, three kafka brokers, a variety of Confluent Platform 5.5.2 components in a single cluster. Use commandline arguments to override the defaults:
+The default cluster has a standalone Zookeeper, three kafka brokers, a variety of Confluent Platform 6.2.1 components in a single cluster. Use commandline arguments to override the defaults:
 
 ```
 Usage:
@@ -25,7 +25,7 @@ Options:
   -o           Exclude observibility containers 'control-center' and 'tools'
   -O           Include 'control-center' and 'tools'
   -r <int>     Number of racks or availability zones (default: none)
-  -v <version> Confluent Platform version (default: 6.1.1)
+  -v <version> Confluent Platform version (default: 6.2.1)
   -z           Zookeeper 3 node ensemble (default: standalone)
   -Z <int>     Zookeeper ensemble with <int> nodes
 
@@ -44,8 +44,8 @@ Mult-cluster Ports:
 IDs:
   Zookeeper    n
   Broker ID  10n
-  Rack ID    1n0
-  Cluster ID n00
+  Rack ID    1n1
+  Cluster ID n01
 ```
 
 TCP/IP ports are opened to all interactions with external programs. The port numbers attempt to be non-conflicting so that you can reach all containers from `localhost` which is especially important when using macOS.
