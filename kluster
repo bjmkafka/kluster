@@ -233,6 +233,7 @@ components () {
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: $ZKLIST
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: $BOOT
       SCHEMA_REGISTRY_LISTENERS: http://schema-registry:${p}081
 
   connect${i}:
